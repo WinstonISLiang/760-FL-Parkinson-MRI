@@ -11,7 +11,8 @@ git pull https://github.com/ails-lab/ntua-parkinson-dataset.git
 
 - The `001.png` of a higher `sY` is a higher resolution image, given `001.png` appears in all `sY` of `pd-patients/SubjectX/0.DAT/sY` subdirectories. We select the largest to ensure we work with the most detailed version, despite possible added computation and overfit risk.
 
-
+- Currently, using z-score normalisation; results in empty hollows, will need to review.
+- HD-BET for skull stripping (more performant version of FSL BET)
 
 **preprocessed_data files are ready for direct use in 3D CNN training pipeline.**
 
