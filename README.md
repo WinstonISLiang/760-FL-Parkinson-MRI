@@ -32,6 +32,7 @@ Each volume has been reshaped from (64, 128, 128) to (1, 64, 128, 128) (channel-
 The preprocessed volumes are stored as .npy files. The file names correspond to the original .nii.gz files.
 
 ## Methodology
+###### Base 3D CNNs
 
 
 ## Results
