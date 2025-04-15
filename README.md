@@ -45,12 +45,14 @@ MaxPool3D: downsampling, reduced computation
 Dropout(0.5): randomly discard neurons to reduce overfitting
 
 #### Hyperparameter Tuning
-Which hyperparameters choose for tuning: Learning Rate, Batch Size, Dropout Rate, Epochs, Model Depth
+Which hyperparameters choose for tuning: Learning Rate, Batch Size, Dropout Rate, Epochs
 Reason: 
 learning rate: can steadily reduce loss and is not too slow.
+
 Batch size: suitable for the current data scale improves training efficiency and effect
+
 Dropout Rate: Prevent overfitting while retaining the expressiveness of the model
+
 Epochs: The epoch that just makes loss converge without overfitting
-Model Depth: Current model three-layer convolution, try to add deeper
 
 ## Results
