@@ -32,7 +32,25 @@ Each volume has been reshaped from (64, 128, 128) to (1, 64, 128, 128) (channel-
 The preprocessed volumes are stored as .npy files. The file names correspond to the original .nii.gz files.
 
 ## Methodology
-###### Base 3D CNNs
+### Base 3D CNNs
+purpose:Binary classification tasks for MRI images (Parkinson’s vs. non-Parkinson’s)
 
+#### base process:
+Data Augmentation：Horizontal flip, vertical flip, Gaussian noise
+Convert to Tensor and construct weight sampler
+Three-layer convolution
+BatchNorm3D: normalization, faster convergence, and reduced overfitting
+ReLU: conventional nonlinear activation
+MaxPool3D: downsampling, reduced computation
+Dropout(0.5): randomly discard neurons to reduce overfitting
+
+#### Hyperparameter Tuning
+Which hyperparameters choose for tuning: Learning Rate, Batch Size, Dropout Rate, Epochs, Model Depth
+Reason: 
+learning rate: can steadily reduce loss and is not too slow.
+Batch size: suitable for the current data scale improves training efficiency and effect
+Dropout Rate: Prevent overfitting while retaining the expressiveness of the model
+Epochs: The epoch that just makes loss converge without overfitting
+Model Depth: Current model three-layer convolution, try to add deeper
 
 ## Results
