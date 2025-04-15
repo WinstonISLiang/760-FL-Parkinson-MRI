@@ -32,16 +32,23 @@ Each volume has been reshaped from (64, 128, 128) to (1, 64, 128, 128) (channel-
 The preprocessed volumes are stored as .npy files. The file names correspond to the original .nii.gz files.
 
 ## Methodology
+
 ### Base 3D CNNs
 purpose:Binary classification tasks for MRI images (Parkinson’s vs. non-Parkinson’s)
 
 #### base process:
 Data Augmentation：Horizontal flip, vertical flip, Gaussian noise
+
 Convert to Tensor and construct weight sampler
+
 Three-layer convolution
+
 BatchNorm3D: normalization, faster convergence, and reduced overfitting
+
 ReLU: conventional nonlinear activation
+
 MaxPool3D: downsampling, reduced computation
+
 Dropout(0.5): randomly discard neurons to reduce overfitting
 
 #### Hyperparameter Tuning
