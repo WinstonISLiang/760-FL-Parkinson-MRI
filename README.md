@@ -53,7 +53,9 @@ Dropout(0.5): randomly discard neurons to reduce overfitting
 
 #### Hyperparameter Tuning
 Which hyperparameters choose for tuning: Learning Rate, Batch Size, Dropout Rate, Epochs
+
 Reason: 
+
 learning rate: can steadily reduce loss and is not too slow.
 
 Batch size: suitable for the current data scale improves training efficiency and effect
