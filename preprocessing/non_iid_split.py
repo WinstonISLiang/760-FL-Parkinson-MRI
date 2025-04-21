@@ -52,3 +52,4 @@ for i, indices in enumerate(client_indices):
     print(f"Client: {i+1}: {len(client_labels)} individuals, "
           f"{n_parkinsons} Parkinson's, {n_healthy} healthy, "
           f"Parkinson's ratio: {n_parkinsons / len(client_labels):.2f}")
+

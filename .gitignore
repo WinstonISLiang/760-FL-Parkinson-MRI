@@ -1,6 +1,5 @@
 ntua-parkinson-dataset
 .mypy_cache
-flwr-learn
 .vscode/
 
 # Byte-compiled / optimized / DLL files
