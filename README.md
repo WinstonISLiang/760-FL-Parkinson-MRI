@@ -64,7 +64,7 @@ Download the NTUA Parkinson Dataset
 git clone https://github.com/ails-lab/ntua-parkinson-dataset.git
 ```
 
-Navigate to the parent directory where both folders are located, and run the following commands:
+Navigate to the NTUA Parkinson directory, and run the following commands:
 
 ```
 mv "Non PD Patients" "non-pd-patients"
