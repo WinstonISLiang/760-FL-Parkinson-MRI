@@ -1,12 +1,12 @@
 import pandas as pd
 import numpy as np
 
-def non_iid_split(df, n_clients, alpha=0.5, min_samples_per_client=1):
-    classes = np.unique(df['Class'])
-    proportions = np.random.dirichlet([alpha] * n_clients, len(classes))
-    client_indices = [[] for _ in range(n_clients)]
+def non_iid_split(df, n_clients, num_nodes, alpha=0.5, min_samples_per_client=1):
+    # classes = np.unique(df['Class'])
+    proportions = np.random.dirichlet([alpha] * n_clients, num_nodes)
+    client_indices = [[] for _ in range(num_nodes)]
 
-    for class_id in classes:
+    for class_id in [0, 1]:
         class_indices = np.unique(df[df['Class'] == class_id]['SubjectID'])
         n_class_samples = len(class_indices)
 

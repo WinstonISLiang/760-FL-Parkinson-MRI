@@ -1,67 +1,111 @@
-# Privacy-Preserving Federated Learning for Early Parkinson's Detection through Decentralized MRI Analysis
+<h3 align="center">Privacy-Preserving Federated Learning for Early Parkinson's Detection through Decentralized MRI Analysis</h3>
 
-## Setup
+<div align="center">
 
-Download the dataset via
+* ignore below will edit links at some point 
+
+[![Status](https://img.shields.io/badge/status-active-success.svg)]()
+[![Platform](https://img.shields.io/badge/platform-reddit-orange.svg)](https://www.reddit.com/user/Wordbook_Bot)
+[![GitHub Issues](https://img.shields.io/github/issues/kylelobo/The-Documentation-Compendium.svg)](https://github.com/kylelobo/The-Documentation-Compendium/issues)
+[![GitHub Pull Requests](https://img.shields.io/github/issues-pr/kylelobo/The-Documentation-Compendium.svg)](https://github.com/kylelobo/The-Documentation-Compendium/pulls)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](/LICENSE)
+
+</div>
+
+---
+
+<p align="center"> 🤖 yes yes will change later
+    <br> 
+</p>
+
+## 📝 Table of Contents
+
+- [About](#about)
+- [Preprocessing](#demo)
+- [Methodology](#working)
+- [Usage](#usage)
+- [Results](#results)
+- [Getting Started](#getting_started)
+- [Deployment](#deployment)
+- [Built Using](#built_using)
+- [Contributing](../CONTRIBUTING.md)
+- [Authors](#authors)
+- [Acknowledgments](#acknowledgement)
+
+## 🧐 About <a name = "about"></a>
+
+Write about 1-2 paragraphs describing the purpose of your project.
+
+## 🎥 Preprocessing <a name = "demo"></a>
+
+TODO
+
+## 💭 Methodology <a name = "working"></a>
+
+TODO
+
+## 🎈 Usage <a name = "usage"></a>
+
+TODO
+
+### Example:
+
+TODO
+
+## 🏁 Getting Started <a name = "getting_started"></a>
+
+These instructions will get you a copy of the project up and running on your local machine for development and testing purposes. See [deployment](#deployment) for notes on how to deploy the project on a live system.
+
+### Prerequisites
+
+Download the NTUA Parkinson Dataset 
 
 ```
-git pull https://github.com/ails-lab/ntua-parkinson-dataset.git
+git clone https://github.com/ails-lab/ntua-parkinson-dataset.git
 ```
-## Preprocessing
 
-- The `001.png` of a higher `sY` is a higher resolution image, given `001.png` appears in all `sY` of `pd-patients/SubjectX/0.DAT/sY` subdirectories. We select the largest to ensure we work with the most detailed version, despite possible added computation and overfit risk.
+Navigate to the parent directory where both folders are located, and run the following commands:
 
-- Currently, using z-score normalisation; results in empty hollows, will need to review.
-- HD-BET for skull stripping (more performant version of FSL BET)
+```
+mv "Non PD Patients" "non-pd-patients"
+mv "PD Patients" "pd-patients"
+```
 
-**preprocessed_data files are ready for direct use in 3D CNN training pipeline.**
+## 🚀 Deployment <a name = "deployment"></a>
+
+After downloading the dataset, below installs the required dependencies.
+
+```
+conda env create -f environment.yml
+conda activate sitk-env
+```
+
+(Optional) Register the kernel for Jupyter
+
+If you're working in Jupyter notebooks and want to select this environment as a kernel:
+
+```
+python -m ipykernel install --user --name=sitk-env
+```
+
+### 🙋 Results
+
+TODO
 
 
-The folder contains the MRI volumes after preprocessing. The preprocessing steps included:
+## ⛏️ Built Using <a name = "built_using"></a>
 
-###### Data Cleaning:
-Volumes with near-zero intensity variation (empty volumes) have been filtered out.
+TODO
 
-###### Intensity Normalization:
-Z-score normalization was applied to each volume (subtract mean, divide by standard deviation).
 
-###### Channel Dimension Added:
-Each volume has been reshaped from (64, 128, 128) to (1, 64, 128, 128) (channel-first format).
+## ✍️ Authors <a name = "authors"></a>
 
-###### File Format:
-The preprocessed volumes are stored as .npy files. The file names correspond to the original .nii.gz files.
+- [@mchhour](https://github.com/subtlewow) - Idea & Initial work
 
-## Methodology
+See also the list of [contributors](https://github.com/subtlewow/760-FL-Parkinson-MRI/graphs/contributors) who participated in this project.
 
-### Base 3D CNNs
-purpose:Binary classification tasks for MRI images (Parkinson’s vs. non-Parkinson’s)
+## 🎉 Acknowledgements <a name = "acknowledgement"></a>
 
-#### base process:
-Data Augmentation：Horizontal flip, vertical flip, Gaussian noise
-
-Convert to Tensor and construct weight sampler
-
-Three-layer convolution
-
-BatchNorm3D: normalization, faster convergence, and reduced overfitting
-
-ReLU: conventional nonlinear activation
-
-MaxPool3D: downsampling, reduced computation
-
-Dropout(0.5): randomly discard neurons to reduce overfitting
-
-#### Hyperparameter Tuning
-Which hyperparameters choose for tuning: Learning Rate, Batch Size, Dropout Rate, Epochs
-
-Reason: 
-
-learning rate: can steadily reduce loss and is not too slow.
-
-Batch size: suitable for the current data scale improves training efficiency and effect
-
-Dropout Rate: Prevent overfitting while retaining the expressiveness of the model
-
-Epochs: The epoch that just makes loss converge without overfitting
-
-## Results
+- Hat tip to anyone whose code was used
+- Inspiration
+- References

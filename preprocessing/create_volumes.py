@@ -1,25 +1,34 @@
 import os
 import numpy as np
-from PIL import Image
-import nibabel as nib
 import pandas as pd
+import nibabel as nib
 import subprocess
 from skimage.transform import resize
+from PIL import Image
+import glob
+import SimpleITK as sitk
+
 import non_iid_split
+import helper
 
 def preprocess_volume(img_dir, target_shape=(64,128,128)):
-    img_files = sorted([f for f in os.listdir(img_dir) if f.endswith(".png")])
-    if not img_files:
-        print(f"No PNG files found in {img_dir}")
-        return
+    '''
+    TODO: add comment
+    '''
+    img_files = helper.sort_img_files(img_dir)
 
-    # stacking 2D images to make 3D volumes w format as (num_slices, 128, 128)
+    # stacking 2D images to build 3D volumes
     slices = []
     for img_path in img_files:
-        img_path = os.path.join(img_dir, img_path)
         img = Image.open(img_path).convert('L') # grayscale
-        img_array = np.array(img) / 255.0 # normalise to [0,1]
+        img_array = helper.normalise(img)
         img_array = resize(img_array, (target_shape[1], target_shape[2]), anti_aliasing=True)
+
+        # check for blank slice
+        if np.std(img_array) < 1e-8:
+            print(f"Empty slice detected in {img_path}")
+            return None # if empty, what should i do with the volume?
+
         slices.append(img_array)
 
     data = np.stack(slices, axis=0) # ensures (D, H, W); not (H, D, W); D = num_slices
@@ -29,11 +38,6 @@ def preprocess_volume(img_dir, target_shape=(64,128,128)):
     if data.shape[0] != target_shape[0]:
         data = resize(data, target_shape, anti_aliasing=True)
         print(f"Resized depth to {target_shape[0]}, new shape={data.shape}")
-
-    # check for empty volume
-    if np.std(data) < 1e-8:
-        print(f"Empty volume detected in {img_dir}, std={np.std(data)}")
-        return None
 
     return data
 
@@ -97,20 +101,21 @@ def skull_strip_hd_volume(data, nifti_dir="../nifti-data", vol_in="../volumes", 
             subprocess.run(cmd)
 
 
-def preprocess_all_volumes(out_dir, normalize_method="z-score", label_file="labelled_patients.csv"):
+def preprocess_all_volumes(out_dir, label_file="labelled_patients.csv"):
     os.makedirs(out_dir, exist_ok=True)
 
     df = pd.read_csv(label_file)
     for x in df.iterrows():
+        modality = x[1]['Type']
         volume = preprocess_volume(x[1]['FilePath'])
-        stripped = skull_strip_hd_volume(volume)
+        # stripped = skull_strip_hd_volume(volume)
 
         # TODO: will need to look at other normalisation methods for different use-cases
-        if normalize_method == 'z-score':
-            stripped_normal = (stripped - np.mean(stripped)) / (np.std(stripped) + 1e-8)
-        elif normalize_method == 'minmax':
-            min_val, max_val = np.min(stripped), np.max(stripped)
-            stripped_normal = (stripped - min_val) / (max_val - min_val + 1e-8)
+        if modality == 'MRI':
+            # img = sitk.GetImageFromArray(stripp)
+            stripped_normal = helper.z_score_norm(stripped, np.mean(stripped), np.std(stripped))
+        elif modality == 'DAT':
+            stripped_normal = helper.min_max_norm(stripped, np.max(stripped), np.min(stripped))
 
         # to ensure compatibility for frameworks - channel-first convention (N, C, D, H, W)
         stripped_normal = np.expand_dims(stripped_normal, axis=0)
@@ -125,6 +130,6 @@ if __name__ == '__main__':
     volume_output_dir = "volumes/temp"
 
     preprocess_all_volumes(volume_output_dir) # skull stripping, z-score norm
-    non_iid_split()
+    # non_iid_split()
 
     df = pd.read_csv(input_file)
