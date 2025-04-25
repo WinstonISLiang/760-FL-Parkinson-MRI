@@ -1,9 +1,9 @@
 import pandas as pd
 import numpy as np
 
-def non_iid_split(df, n_clients, num_nodes, alpha=0.5, min_samples_per_client=1):
-    # classes = np.unique(df['Class'])
-    proportions = np.random.dirichlet([alpha] * n_clients, num_nodes)
+def non_iid_split(df, num_nodes, alpha=0.5, min_samples_per_client=1):
+    classes = np.unique(df['Class'])
+    proportions = np.random.dirichlet([alpha] * classes, num_nodes)
     client_indices = [[] for _ in range(num_nodes)]
 
     for class_id in [0, 1]:
@@ -15,7 +15,7 @@ def non_iid_split(df, n_clients, num_nodes, alpha=0.5, min_samples_per_client=1)
         samples_per_client = (class_proportions * n_class_samples).astype(int)
 
         # ensures no client node is given 0 samples
-        for i in range(n_clients):
+        for i in range(classes):
             if samples_per_client[i] < min_samples_per_client and n_class_samples > 0:
                 samples_per_client[i] = min(min_samples_per_client, n_class_samples)
 
@@ -36,7 +36,7 @@ def non_iid_split(df, n_clients, num_nodes, alpha=0.5, min_samples_per_client=1)
             client_indices[client_id].extend(indices)
 
     # shuffle with clients grouped
-    for client_id in range(n_clients):
+    for client_id in range(classes):
         np.random.shuffle(client_indices[client_id])
 
     return client_indices

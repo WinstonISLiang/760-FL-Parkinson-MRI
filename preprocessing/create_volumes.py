@@ -7,9 +7,15 @@ from skimage.transform import resize
 from PIL import Image
 import glob
 import SimpleITK as sitk
+import napari
 
-import non_iid_split
+# import non_iid_split
 import helper
+
+def visualise(img, title="Untitled"):
+    viewer = napari.Viewer(title=title)
+    viewer.add_image(sitk.GetArrayFromImage(img), name='3D volume')
+    napari.run()
 
 def preprocess_volume(img_dir, target_shape=(64,128,128)):
     '''
@@ -41,39 +47,24 @@ def preprocess_volume(img_dir, target_shape=(64,128,128)):
 
     return data
 
-# def skull_strip_fsl_volume(data, fsl_in="../volumes_fsl", fsl_out="fsl_bet_volumes"):
-    ### TODO: compare FSL-BET vs HD-BET, use metric to compare performance
-#     os.makedirs(fsl_in, exist_ok=True)
-#     os.makedirs(fsl_out, exist_ok=True)
+def bias_correction(data, img_dir, spacing=(1.0, 1.0, 1.0)):
+    """Apply N4 bias field correction to a 3D volume."""
+    if not np.isfinite(data).all():
+        print(f"Invalid values (NaN/inf) before bias correction for {img_dir}")
+        return None
+    img = sitk.GetImageFromArray(data)
+    img.SetSpacing(spacing)
+    corrector = sitk.N4BiasFieldCorrectionImageFilter()
+    try:
+        corrected_img = corrector.Execute(img)
+        data = sitk.GetArrayFromImage(corrected_img)
+        print(f"Bias correction completed for {img_dir}, shape={data.shape}")
+        return data
+    except Exception as e:
+        print(f"Bias correction failed for {img_dir}: {e}")
+        return None
 
-#     # save 3D vol as temp .nii.gz
-#     temp_in = os.path.join(fsl_in, "temp_input.nii.gz")
-#     temp_out = os.path.join(fsl_out, "temp_output.nii.gz")
-
-#     # create NIfTI image
-#     nii_img = nib.Nifti1Image(data, affine=np.eye(4))
-#     nib.save(nii_img, temp_in)
-
-#     # FSL BET for skull stripping
-#     try:
-#         subprocess.run([
-#             "bet",
-#             '-i', temp_in,
-#             '-o', temp_out,
-#             "-F"
-#         ], check=True)
-
-#     except subprocess.CalledProcessError:
-#         print("FSL BET Failed. ")
-#         return
-
-#     stripped_img = nib.load(temp_out)
-#     stripped_data = stripped_img.get_fdata()
-
-#     return stripped_data
-
-
-def skull_strip_hd_volume(data, nifti_dir="../nifti-data", vol_in="../volumes", vol_out="../skull-stripped"):
+def skull_strip_volume(data, nifti_dir="../nifti-data", vol_in="../volumes", vol_out="../skull-stripped"):
     os.makedirs(nifti_dir, exist_ok=True)
     os.makedirs(vol_out, exist_ok=True)
 
@@ -100,19 +91,47 @@ def skull_strip_hd_volume(data, nifti_dir="../nifti-data", vol_in="../volumes", 
             print(f'--> Running skull stripping on: {nii_path}')
             subprocess.run(cmd)
 
-
-def preprocess_all_volumes(out_dir, label_file="labelled_patients.csv"):
+def preprocess_all_volumes(out_dir, label_file):
     os.makedirs(out_dir, exist_ok=True)
-
     df = pd.read_csv(label_file)
-    for x in df.iterrows():
-        modality = x[1]['Type']
-        volume = preprocess_volume(x[1]['FilePath'])
-        # stripped = skull_strip_hd_volume(volume)
+
+    for _, row in df.iterrows():
+        modality = row['Type']
+        file_path = row['FilePath']
+        print(f"Preprocessing {file_path} ({modality})")
+
+        # preprocess and resample volume
+        result = preprocess_volume(file_path)
+        visualise(sitk.GetImageFromArray(result))
+        if result is None:
+            print(f"Skipping {file_path} due to preprocessing failure")
+            continue
+
+        # TODO: need to resample to 1mm {here}
+
+        # stripped_nii_path = skull_strip_volume(result, file_path)
+        # if stripped_nii_path is None:
+        #     print(f"Skipping {file_path} due to skull stripping failure")
+        #     continue
+
+        # # convert to .npy
+        # base_name = os.path.basename(file_path)
+        # npy_path = os.path.join(out_dir, f"{base_name}_skull_stripped.npy")
+        # data = helper.nii_to_npy(stripped_nii_path, npy_path)
+        # if data is None:
+        #     print(f"Skipping {file_path} due to .npy conversion error")
+        #     continue
+
+        # if modality == 'MRI':
+        #     bias_corrected = bias_correction(stripped)
+
+
+        # img = sitk.GetImageFromArray(stripped)
+        # visualise(img)
+
 
         # TODO: will need to look at other normalisation methods for different use-cases
         if modality == 'MRI':
-            # img = sitk.GetImageFromArray(stripp)
             stripped_normal = helper.z_score_norm(stripped, np.mean(stripped), np.std(stripped))
         elif modality == 'DAT':
             stripped_normal = helper.min_max_norm(stripped, np.max(stripped), np.min(stripped))
@@ -126,10 +145,10 @@ def preprocess_all_volumes(out_dir, label_file="labelled_patients.csv"):
         print(f"Saved: {out_filename} at {save_path}")
 
 if __name__ == '__main__':
-    input_file = "labelled_patients.csv"
+    input_file = "../labelled_patients.csv"
     volume_output_dir = "volumes/temp"
 
-    preprocess_all_volumes(volume_output_dir) # skull stripping, z-score norm
+    preprocess_all_volumes(volume_output_dir, input_file) # skull stripping, z-score norm
     # non_iid_split()
 
     df = pd.read_csv(input_file)
