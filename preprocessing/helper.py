@@ -33,7 +33,8 @@ def sort_img_files(img_dir: str):
     Fix: Using glob (Python library for searching files through directories, efficiently)
     '''
     img_files = sorted(glob.glob(os.path.join('../' + img_dir, "*.png")))
-    print(os.path.join(img_dir, "*.png"))
+    # print(os.path.join(img_dir, "*.png"))
+    print(img_files)
 
     if not img_files:
         raise ValueError(f"No PNG files found in {img_dir}")

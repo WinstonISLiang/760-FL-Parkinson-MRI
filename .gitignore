@@ -1,6 +1,7 @@
 ntua-parkinson-dataset
 .mypy_cache
 .vscode/
+nifti-data
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

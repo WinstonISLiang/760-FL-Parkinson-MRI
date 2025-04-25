@@ -75,6 +75,10 @@ mv "PD Patients" "pd-patients"
 
 After downloading the dataset, below installs the required dependencies.
 
+The main dependencies required:
+- `SimpleITK` for preprocessing
+- `napari` for 3D visualisation
+
 ```
 conda env create -f environment.yml
 conda activate sitk-env
