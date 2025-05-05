@@ -12,11 +12,13 @@ import helper
 from typing import Tuple
 # import non_iid_split
 
-def stacking2D(img_dir: str, target_shape: Tuple[int,int,int] = (64,128,128), std_threshold: float = 0.1, use_16bit: bool = True):
+def stacking2D(img_dir: str, target_shape: Tuple[int,int,int] = (64,128,128),
+               std_threshold: float = 0.1, use_16bit: bool = True):
     '''
     Stacking 2D slices into 3D volumes.
     '''
     img_files = helper.sort_img_files(img_dir)
+    print(img_files)
 
     slices = []
     for img_path in img_files:
