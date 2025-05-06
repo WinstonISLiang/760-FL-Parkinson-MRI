@@ -3,6 +3,80 @@ from PIL import Image
 import glob
 import nibabel as nib
 import os
+import napari
+import sitk
+import re
+
+'''
+
+    Helper functions for create_volumes.py:
+    - get_bit_depth(img_path): checks the bit of image to determine which preprocessing method to apply.
+    - visualise(img): 3D visualiser of image
+    - get_prefix_and_suffix(filename): gets the prefix, suffix of a filename
+    - group_by_prefix(filenames): groups suffixes by a common prefix using hashing
+
+    stacking2D()
+      : get_bit_depth(img_path)
+      : visualise(img)
+
+'''
+
+def get_bit_depth(image_path: str):
+    mode_to_bits = {
+        '1': 1,
+        'L': 8,
+        'P': 8,
+        'RGB': 24,
+        'RGBA': 32,
+        'CMYK': 32,
+        'I': 32,
+        'F': 32
+    }
+
+    try:
+        img = Image.open(image_path)
+        bit = mode_to_bits.get(img.mode, None)
+        return bit
+    except FileNotFoundError:
+        print(f"Error: Image file not found at {image_path}")
+        return
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return
+
+def get_prefix_and_suffix(filename):
+    match = re.match(r'(.*?)(\d{3})\.png', filename)
+    if match:
+        prefix = match.group(1)
+        suffix = match.group(2)
+        return prefix, suffix
+
+    return None, None
+
+def group_by_prefix(filenames):
+    prefix_map = {}
+    for filename in filenames:
+        prefix, suffix = get_prefix_and_suffix(filename)
+
+        if prefix is not None:
+            if prefix not in prefix_map:
+                prefix_map[prefix] = []
+            prefix_map[prefix].append(suffix)
+
+    return prefix_map
+
+
+
+
+def visualise(img, title:str ="Untitled"):
+    viewer = napari.Viewer(title=title)
+    viewer.add_image(sitk.GetArrayFromImage(img), name='3D volume')
+    napari.run()
+
+
+
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+
 import SimpleITK as sitk
 
 def min_max_norm(img_arr: np.array, max_int: int, min_int: int, epsilon=1e-8):
@@ -25,6 +99,8 @@ def normalise(img: Image):
         img_array = img_array / 255.0
 
     return img_array
+
+
 
 def sort_img_files(img_dir: str):
     '''

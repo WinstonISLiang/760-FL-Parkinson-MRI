@@ -8,34 +8,49 @@ from PIL import Image
 import glob
 import SimpleITK as sitk
 import napari
-
-# import non_iid_split
 import helper
+from typing import Tuple
+# import non_iid_split
 
-def visualise(img, title="Untitled"):
-    viewer = napari.Viewer(title=title)
-    viewer.add_image(sitk.GetArrayFromImage(img), name='3D volume')
-    napari.run()
-
-def preprocess_volume(img_dir, target_shape=(64,128,128)):
+def stacking2D(img_dir: str, target_shape: Tuple[int,int,int] = (64,128,128),
+               std_threshold: float = 0.1, use_16bit: bool = True):
     '''
-    TODO: add comment
+    Stacking 2D slices into 3D volumes.
     '''
     img_files = helper.sort_img_files(img_dir)
+    print(img_files)
 
-    # stacking 2D images to build 3D volumes
     slices = []
     for img_path in img_files:
+        bit_depth = helper.get_bit_depth(img_path)
         img = Image.open(img_path).convert('L') # grayscale
+        img_array = np.array(img)
+
+        # ensures all imgs are 16-bit / 8-bit
+        if use_16bit:
+            if bit_depth == 8:
+                img_array = (img_array * 256).astype(np.uint16)
+            elif bit_depth == 16:
+                img_array = img_array.astype(np.uint16)
+        else:
+            if bit_depth == 16:
+                img_array = (img_array / 256).astype(np.uint8)
+            elif bit_depth == 8:
+                img_array = img_array.astype(np.uint8)
+
         img_array = helper.normalise(img)
         img_array = resize(img_array, (target_shape[1], target_shape[2]), anti_aliasing=True)
 
         # check for blank slice
-        if np.std(img_array) < 1e-8:
-            print(f"Empty slice detected in {img_path}")
-            return None # if empty, what should i do with the volume?
+        if np.std(img_array) < std_threshold:
+            print(f"Empty slice detected in {img_path}, skipping")
+            continue
 
         slices.append(img_array)
+
+    if not slices:
+        print(f"No valid slices in {img_dir}")
+        return
 
     data = np.stack(slices, axis=0) # ensures (D, H, W); not (H, D, W); D = num_slices
     print(f"Stacked {len(slices)} in {img_dir}, shape={data.shape}")
@@ -45,24 +60,12 @@ def preprocess_volume(img_dir, target_shape=(64,128,128)):
         data = resize(data, target_shape, anti_aliasing=True)
         print(f"Resized depth to {target_shape[0]}, new shape={data.shape}")
 
+    # ensure correct dtype
+    data = data.astype(np.uint16 if use_16bit else np.uint8)
+
     return data
 
-def bias_correction(data, img_dir, spacing=(1.0, 1.0, 1.0)):
-    """Apply N4 bias field correction to a 3D volume."""
-    if not np.isfinite(data).all():
-        print(f"Invalid values (NaN/inf) before bias correction for {img_dir}")
-        return None
-    img = sitk.GetImageFromArray(data)
-    img.SetSpacing(spacing)
-    corrector = sitk.N4BiasFieldCorrectionImageFilter()
-    try:
-        corrected_img = corrector.Execute(img)
-        data = sitk.GetArrayFromImage(corrected_img)
-        print(f"Bias correction completed for {img_dir}, shape={data.shape}")
-        return data
-    except Exception as e:
-        print(f"Bias correction failed for {img_dir}: {e}")
-        return None
+## todo: implement bias correction somwhere
 
 def skull_strip_volume(data, nifti_dir="../nifti-data", vol_in="../volumes", vol_out="../skull-stripped"):
     os.makedirs(nifti_dir, exist_ok=True)
@@ -101,8 +104,8 @@ def preprocess_all_volumes(out_dir, label_file):
         print(f"Preprocessing {file_path} ({modality})")
 
         # preprocess and resample volume
-        result = preprocess_volume(file_path)
-        visualise(sitk.GetImageFromArray(result))
+        result = stacking2D(file_path)
+        helper.visualise(sitk.GetImageFromArray(result))
         if result is None:
             print(f"Skipping {file_path} due to preprocessing failure")
             continue
