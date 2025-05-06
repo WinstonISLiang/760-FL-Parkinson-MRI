@@ -3,6 +3,7 @@ from PIL import Image
 import glob
 import nibabel as nib
 import os
+import SimpleITK as sitk
 
 def min_max_norm(img_arr: np.array, max_int: int, min_int: int, epsilon=1e-8):
     return (img_arr - min_int) / (max_int - min_int + epsilon)
@@ -32,8 +33,9 @@ def sort_img_files(img_dir: str):
 
     Fix: Using glob (Python library for searching files through directories, efficiently)
     '''
-    img_files = sorted(glob.glob(os.path.join('../' + img_dir, "*.png")))
-    print(os.path.join(img_dir, "*.png"))
+    img_files = sorted(glob.glob(os.path.join(img_dir, "*.png")))
+    # print(os.path.join(img_dir, "*.png"))
+    # print(img_files)
 
     if not img_files:
         raise ValueError(f"No PNG files found in {img_dir}")
@@ -72,3 +74,47 @@ def nii_to_npy(nii_path, npy_path):
     except Exception as e:
         print(f"Failed to convert {nii_path}: {e}")
         return None
+
+
+def apply_n4_bias_correction(img_path: str, mask_fissure: bool = True) -> sitk.Image:
+    """
+    Apply N4 Bias Field Correction to a single NIfTI image.
+
+    Args:
+        img_path: Path to input .nii or .nii.gz file.
+        mask_fissure: If True, use Otsu thresholding to create a mask for correction.
+
+    Returns:
+        Corrected SimpleITK Image.
+    """
+    img = sitk.ReadImage(img_path)
+    img_float = sitk.Cast(img, sitk.sitkFloat32)
+    if mask_fissure:
+        mask = sitk.OtsuThreshold(img_float, 0, 1, 200)
+    else:
+        mask = None
+    corrector = sitk.N4BiasFieldCorrectionImageFilter()
+    corrected_img = corrector.Execute(img_float, mask)
+    return corrected_img
+
+
+def batch_bias_correction(input_dir: str, output_dir: str, pattern: str = "*.nii.gz") -> None:
+    """
+    Apply N4 bias correction to all NIfTI files in input_dir and save results to output_dir.
+
+    Args:
+        input_dir: Directory containing .nii or .nii.gz files.
+        output_dir: Directory where corrected images will be saved.
+        pattern: Glob pattern to match input files.
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    files = glob.glob(os.path.join(input_dir, pattern))
+    if not files:
+        raise ValueError(f"No files matching {pattern} in {input_dir}")
+    for fpath in files:
+        print(f'--> Applying Bias Correction on: {fpath}')
+        corrected = apply_n4_bias_correction(fpath)
+        base = os.path.splitext(os.path.splitext(os.path.basename(fpath))[0])[0]
+        save_path = os.path.join(output_dir, f"{base}_bias_corrected.nii.gz")
+        sitk.WriteImage(corrected, save_path)
+        print(f'[✓] Saved corrected image: {save_path}')
