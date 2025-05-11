@@ -9,5 +9,5 @@ df = pd.read_csv(input_file)
 for _, row in df.iterrows():
     file_path = row['FilePath']
     x = stacking2D(file_path)
-    print(x)
+    # print(x)
     break

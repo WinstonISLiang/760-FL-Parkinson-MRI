@@ -1,6 +1,7 @@
 from skimage.transform import resize
 from PIL import Image
 from typing import Tuple, Dict, List
+from collections import defaultdict
 
 import os
 import numpy as np
@@ -12,7 +13,6 @@ import SimpleITK as sitk
 import napari
 import helper
 # import non_iid_split
-import re
 
 def stacking2D(img_dir: str, target_shape: Tuple[int,int,int] = (64,128,128),
                std_threshold: float = 0.1, use_16bit: bool = True):
@@ -20,31 +20,28 @@ def stacking2D(img_dir: str, target_shape: Tuple[int,int,int] = (64,128,128),
     Stacking 2D slices into 3D volumes.
     '''
     img_files = helper.sort_img_files(img_dir)
+    num_slices = len(img_files)
+    print(f"Number of slices in {img_dir}: {num_slices}")
 
     # group slices by sequence prefix (e.g., T1W_FFE, T2W_FLAIR)
-    grouped_slices: Dict[str, List[str]] = {}
-    for img_path in img_files:
-        filename = os.path.basename(img_path)
-        match = re.match(r'^(T\dW_[A-Z]+)', filename)  # extract sequence prefix (e.g., 'T1W_FFE' from 'T1W_FFE_001.png')
-        print(match)
+    prefix_map = defaultdict(list)
+    for file in img_files:
+        prefix, suffix = helper.get_prefix_and_suffix(file)
 
-        if match:
-            seq_prefix = match.group(1)
-        else:
-            seq_prefix = 'unknown'
-            print(f"Warning: Could not extract sequence prefix from {filename}, using 'unknown'")
+        if prefix is not None:
+            prefix_map[prefix].append(suffix)
 
-        if seq_prefix not in grouped_slices:
-            grouped_slices[seq_prefix] = []
-        grouped_slices[seq_prefix].append(img_path)
+        # print(f"Filename: {file}, Prefix Map: {prefix_map}")
 
     # process each sequence group separately
     volumes: Dict[str, np.ndarray] = {}
-    for seq_prefix, group_paths in grouped_slices.items():
-        print(f"Processing group '{seq_prefix}' with {len(group_paths)} slices")
+    for seq_prefix, suffix_values in prefix_map.items():
+        print(f"Processing group '{seq_prefix}' with {len(suffix_values)} slices")
 
         slices = []
-        for img_path in group_paths:
+        for suffix in suffix_values:
+            img_path = os.path.join(seq_prefix + suffix + '.png')
+            print(img_path)
             img = Image.open(img_path).convert('L') # grayscale
             img_array = np.array(img)
 
@@ -52,7 +49,7 @@ def stacking2D(img_dir: str, target_shape: Tuple[int,int,int] = (64,128,128),
             bit_depth = helper.get_bit_depth(img_path)
             if use_16bit:
                 if bit_depth == 8:
-                    img_array = (img_array * 256).astype(np.uint16)
+                    img_array = (img_array * 255).astype(np.uint16)
                 elif bit_depth == 16:
                     img_array = img_array.astype(np.uint16)
             else:

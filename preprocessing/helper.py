@@ -52,21 +52,6 @@ def get_prefix_and_suffix(filename):
 
     return None, None
 
-def group_by_prefix(filenames):
-    prefix_map = {}
-    for filename in filenames:
-        prefix, suffix = get_prefix_and_suffix(filename)
-
-        if prefix is not None:
-            if prefix not in prefix_map:
-                prefix_map[prefix] = []
-            prefix_map[prefix].append(suffix)
-
-    return prefix_map
-
-
-
-
 def visualise(img, title:str ="Untitled"):
     viewer = napari.Viewer(title=title)
     viewer.add_image(sitk.GetArrayFromImage(img), name='3D volume')
@@ -95,8 +80,6 @@ def normalise(img: Image):
 
     return img_array
 
-
-
 def sort_img_files(img_dir: str):
     '''
     .sorted() assumes filesnames are lexicographically ordered (eg. slice_001.png, slice_002.png)
@@ -106,7 +89,6 @@ def sort_img_files(img_dir: str):
     '''
     img_files = sorted(glob.glob(os.path.join('../' + img_dir, "*.png"))) # don't remove ../
     print(img_files)
-    # print(os.path.join(img_dir, "*.png"))
 
     if not img_files:
         raise ValueError(f"No PNG files found in {img_dir}")
