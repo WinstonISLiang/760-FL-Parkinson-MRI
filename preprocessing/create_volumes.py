@@ -1,16 +1,18 @@
+from skimage.transform import resize
+from PIL import Image
+from typing import Tuple, Dict, List
+
 import os
 import numpy as np
 import pandas as pd
 import nibabel as nib
 import subprocess
-from skimage.transform import resize
-from PIL import Image
 import glob
 import SimpleITK as sitk
 import napari
 import helper
-from typing import Tuple
 # import non_iid_split
+import re
 
 def stacking2D(img_dir: str, target_shape: Tuple[int,int,int] = (64,128,128),
                std_threshold: float = 0.1, use_16bit: bool = True):
@@ -18,52 +20,79 @@ def stacking2D(img_dir: str, target_shape: Tuple[int,int,int] = (64,128,128),
     Stacking 2D slices into 3D volumes.
     '''
     img_files = helper.sort_img_files(img_dir)
-    print(img_files)
 
-    slices = []
+    # group slices by sequence prefix (e.g., T1W_FFE, T2W_FLAIR)
+    grouped_slices: Dict[str, List[str]] = {}
     for img_path in img_files:
-        bit_depth = helper.get_bit_depth(img_path)
-        img = Image.open(img_path).convert('L') # grayscale
-        img_array = np.array(img)
+        filename = os.path.basename(img_path)
+        match = re.match(r'^(T\dW_[A-Z]+)', filename)  # extract sequence prefix (e.g., 'T1W_FFE' from 'T1W_FFE_001.png')
+        print(match)
 
-        # ensures all imgs are 16-bit / 8-bit
-        if use_16bit:
-            if bit_depth == 8:
-                img_array = (img_array * 256).astype(np.uint16)
-            elif bit_depth == 16:
-                img_array = img_array.astype(np.uint16)
+        if match:
+            seq_prefix = match.group(1)
         else:
-            if bit_depth == 16:
-                img_array = (img_array / 256).astype(np.uint8)
-            elif bit_depth == 8:
-                img_array = img_array.astype(np.uint8)
+            seq_prefix = 'unknown'
+            print(f"Warning: Could not extract sequence prefix from {filename}, using 'unknown'")
 
-        img_array = helper.normalise(img)
-        img_array = resize(img_array, (target_shape[1], target_shape[2]), anti_aliasing=True)
+        if seq_prefix not in grouped_slices:
+            grouped_slices[seq_prefix] = []
+        grouped_slices[seq_prefix].append(img_path)
 
-        # check for blank slice
-        if np.std(img_array) < std_threshold:
-            print(f"Empty slice detected in {img_path}, skipping")
-            continue
+    # process each sequence group separately
+    volumes: Dict[str, np.ndarray] = {}
+    for seq_prefix, group_paths in grouped_slices.items():
+        print(f"Processing group '{seq_prefix}' with {len(group_paths)} slices")
 
-        slices.append(img_array)
+        slices = []
+        for img_path in group_paths:
+            img = Image.open(img_path).convert('L') # grayscale
+            img_array = np.array(img)
 
-    if not slices:
-        print(f"No valid slices in {img_dir}")
-        return
+            # build volumes using the same bit dtype
+            bit_depth = helper.get_bit_depth(img_path)
+            if use_16bit:
+                if bit_depth == 8:
+                    img_array = (img_array * 256).astype(np.uint16)
+                elif bit_depth == 16:
+                    img_array = img_array.astype(np.uint16)
+            else:
+                if bit_depth == 16:
+                    img_array = (img_array / 256).astype(np.uint8)
+                elif bit_depth == 8:
+                    img_array = img_array.astype(np.uint8)
 
-    data = np.stack(slices, axis=0) # ensures (D, H, W); not (H, D, W); D = num_slices
-    print(f"Stacked {len(slices)} in {img_dir}, shape={data.shape}")
+            img_array = helper.normalise(img)
+            img_array = resize(img_array, (target_shape[1], target_shape[2]), anti_aliasing=True)
 
-    # resize depth
-    if data.shape[0] != target_shape[0]:
-        data = resize(data, target_shape, anti_aliasing=True)
-        print(f"Resized depth to {target_shape[0]}, new shape={data.shape}")
+            # check for blank slice
+            if np.std(img_array) < std_threshold:
+                print(f"No valid slices in group '{seq_prefix}' for {img_dir}")
+                continue
 
-    # ensure correct dtype
-    data = data.astype(np.uint16 if use_16bit else np.uint8)
+            slices.append(img_array)
 
-    return data
+        if not slices:
+            print(f"No valid slices in {img_dir}")
+            return
+
+        data = np.stack(slices, axis=0) # ensures (D, H, W); not (H, D, W); D = num_slices
+        print(f"Stacked {len(slices)} in {img_dir}, shape={data.shape}")
+
+        # resize depth
+        if data.shape[0] != target_shape[0]:
+            data = resize(data, target_shape, anti_aliasing=True)
+            print(f"Resized depth to {target_shape[0]}, new shape={data.shape}")
+
+        # ensure correct dtype
+        data = data.astype(np.uint16 if use_16bit else np.uint8)
+
+        volumes[seq_prefix] = data
+
+    if not volumes:
+        print(f"No valid volumes created for {img_dir}")
+        return {}
+
+    return volumes
 
 ## todo: implement bias correction somwhere
 
@@ -147,11 +176,6 @@ def preprocess_all_volumes(out_dir, label_file):
         np.save(save_path, volume)
         print(f"Saved: {out_filename} at {save_path}")
 
-if __name__ == '__main__':
-    input_file = "../labelled_patients.csv"
-    volume_output_dir = "volumes/temp"
 
-    preprocess_all_volumes(volume_output_dir, input_file) # skull stripping, z-score norm
-    # non_iid_split()
+# non_iid_split()
 
-    df = pd.read_csv(input_file)

@@ -39,13 +39,13 @@ for filename in filenames:
     print(f"Filename: {filename}, Prefix: {prefix}, Suffix: {suffix}")
 
 
-def sort_img_files(img_dir: str):
-    img_files = sorted(glob.glob(os.path.join(img_dir, "*.png")))
+# def sort_img_files(img_dir: str):
+#     img_files = sorted(glob.glob(os.path.join(img_dir, "*.png")))
 
-    if not img_files:
-        raise ValueError(f"No PNG files found in {img_dir}")
+#     if not img_files:
+#         raise ValueError(f"No PNG files found in {img_dir}")
 
-    return img_files
+#     return img_files
 
-x = sort_img_files("ntua-parkinson-dataset/pd-patients/Subject4/1.MRI")
-print(x)
+# x = sort_img_files("ntua-parkinson-dataset/pd-patients/Subject4/1.MRI")
+# print(x)

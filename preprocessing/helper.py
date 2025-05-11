@@ -4,11 +4,10 @@ import glob
 import nibabel as nib
 import os
 import napari
-import sitk
 import re
+import SimpleITK as sitk
 
 '''
-
     Helper functions for create_volumes.py:
     - get_bit_depth(img_path): checks the bit of image to determine which preprocessing method to apply.
     - visualise(img): 3D visualiser of image
@@ -75,10 +74,6 @@ def visualise(img, title:str ="Untitled"):
 
 
 
-''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
-
-import SimpleITK as sitk
-
 def min_max_norm(img_arr: np.array, max_int: int, min_int: int, epsilon=1e-8):
     return (img_arr - min_int) / (max_int - min_int + epsilon)
 
@@ -109,9 +104,9 @@ def sort_img_files(img_dir: str):
 
     Fix: Using glob (Python library for searching files through directories, efficiently)
     '''
-    img_files = sorted(glob.glob(os.path.join(img_dir, "*.png")))
+    img_files = sorted(glob.glob(os.path.join('../' + img_dir, "*.png"))) # don't remove ../
+    print(img_files)
     # print(os.path.join(img_dir, "*.png"))
-    # print(img_files)
 
     if not img_files:
         raise ValueError(f"No PNG files found in {img_dir}")
