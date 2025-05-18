@@ -88,6 +88,7 @@ def stacking2D(
             print(f"Resized depth to {target_shape[0]}, new shape={data.shape}")
 
         # ensure integer dtype
+        # changed from original code: data = data.astype(np.uint16 if use_16bit else np.uint8)
         if use_16bit:
             data = (data * 65535).round().astype(np.uint16)  # 0–65535
         else:
@@ -102,34 +103,134 @@ def stacking2D(
     return volumes
 
 
-# TODO: implement bias-field correction somewhere
-def skull_strip_volume(
-    npy_dir: str, nifti_dir="../nifti-data", out_dir="../skull-stripped"
-):
+import os
+import tempfile
+import subprocess
+import shutil
+import numpy as np
+import nibabel as nib
+
+def skull_strip_array(
+        volume: np.ndarray,
+        device: str = "cpu",
+        mode: str = "fast"
+) -> np.ndarray:
     """
-    Convert each .npy volume to .nii.gz and run HD-BET skull stripping.
+    Run HD-BET skull stripping on a 3-D (D, H, W) or 4-D (C, D, H, W) NumPy
+    volume and return the brain-extracted volume as a NumPy array.
+
+    Parameters
+    ----------
+    volume : np.ndarray
+        Input MRI volume.  Accepts either:
+        * shape = (D, H, W)  – single-channel 3-D volume, or
+        * shape = (C, D, H, W) with C == 1 – channel-first convention.
+        The data are **not** copied; the array is only cast to float32
+        when written to disk for HD-BET.
+    device : str, optional
+        Which compute device HD-BET should use.
+        * "cpu"  – force CPU inference (portable, default).
+        * "0", "1", … – CUDA GPU ID.
+    mode : str, optional
+        HD-BET preset:
+        * "fast"  – lower accuracy, higher speed.
+        * "accurate" – default HD-BET setting (slower).
+
+    Returns
+    -------
+    np.ndarray
+        Brain-extracted volume with the **same dtype** and spatial shape
+        as the input.  If the input had an extra channel dimension the
+        returned array keeps that dimension.
+
+    Notes
+    -----
+    1. The function writes a temporary NIfTI file under a randomly
+       generated directory (e.g. /tmp/hd_bet_abcdef/).
+       All intermediate files are removed in the `finally` block.
+    2. HD-BET is called via its command-line interface, so the
+       `hd-bet` executable must be available in the current environment.
+    3. Only single-channel volumes are supported because HD-BET expects
+       normal structural MRI input.  If multi-contrast stripping is
+       required, run the function on each channel separately.
     """
-    os.makedirs(nifti_dir, exist_ok=True)
-    os.makedirs(out_dir, exist_ok=True)
+    # ------------------------------------------------------------------
+    # 0. Handle a possible leading channel dimension (C, D, H, W).
+    #    HD-BET only accepts a 3-D volume, so squeeze it out and remember
+    #    to restore it afterwards.
+    # ------------------------------------------------------------------
+    need_unsqueeze = False
+    if volume.ndim == 4:
+        if volume.shape[0] != 1:
+            raise ValueError(
+                "Only single-channel skull stripping is supported. "
+                f"Got volume.shape={volume.shape}."
+            )
+        volume = volume[0]           # shape -> (D, H, W)
+        need_unsqueeze = True
 
-    for file in glob.glob(os.path.join(npy_dir, "*.npy")):
-        base = os.path.splitext(os.path.basename(file))[0]
-        nii_path = os.path.join(nifti_dir, f"{base}.nii.gz")
-        out_path = os.path.join(out_dir, f"{base}_stripped.nii.gz")
+    # ------------------------------------------------------------------
+    # 1. Create a unique temporary directory for all intermediate files.
+    #    Using tempfile ensures automatic name collision avoidance.
+    # ------------------------------------------------------------------
+    tmp_dir = tempfile.mkdtemp(prefix="hd_bet_")
 
-        vol = np.load(file)
-        nib_img = sitk.GetImageFromArray(
-            vol.squeeze()
-        )  # assumes (C,D,H,W) or (D,H,W)
-        sitk.WriteImage(nib_img, nii_path)
-        print(f"📝 saved   {nii_path}")
+    try:
+        # Full paths used by HD-BET
+        in_path  = os.path.join(tmp_dir, "in.nii.gz")
+        out_pref = os.path.join(tmp_dir, "out")        # HD-BET adds suffixes
 
-        cmd = ["hd-bet", "-i", nii_path, "-o", out_path, "-device", "cpu"]
-        print(f"🚀 HD-BET  {nii_path}")
-        subprocess.run(cmd, check=True)
+        # ------------------------------------------------------------------
+        # 2. Dump the NumPy array to NIfTI.  HD-BET expects float32 input.
+        # ------------------------------------------------------------------
+        nib.save(
+            nib.Nifti1Image(volume.astype(np.float32), affine=np.eye(4)),
+            in_path
+        )
+
+        # ------------------------------------------------------------------
+        # 3. Call HD-BET via subprocess.  Stderr/stdout are captured so that
+        #    any failure raises CalledProcessError for easier debugging.
+        # ------------------------------------------------------------------
+        cmd = [
+            "hd-bet",
+            "-i", in_path,
+            "-o", out_pref,
+            "-device", device,
+            "-mode", mode
+        ]
+        subprocess.run(
+            cmd,
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+
+        # ------------------------------------------------------------------
+        # 4. Read the stripped result back into memory.
+        #    HD-BET appends '_stripped.nii.gz' to the output prefix.
+        # ------------------------------------------------------------------
+        stripped_path = f"{out_pref}_stripped.nii.gz"
+        stripped = nib.load(stripped_path).get_fdata(dtype=volume.dtype)
+
+        # ------------------------------------------------------------------
+        # 5. Restore the original channel dimension if it was present.
+        # ------------------------------------------------------------------
+        if need_unsqueeze:
+            stripped = stripped[np.newaxis, ...]  # shape -> (1, D, H, W)
+
+        return stripped
+
+    finally:
+        # ------------------------------------------------------------------
+        # 6. Always remove the temporary directory, even if an exception
+        #    occurred, to keep the file system clean.
+        # ------------------------------------------------------------------
+        shutil.rmtree(tmp_dir)
 
 
-# ------------------------------------------------------------------
+
+
 def resample_isotropic(
     volume: np.ndarray,
     original_spacing=(3.0, 2.0, 2.0),
@@ -156,7 +257,6 @@ def resample_isotropic(
     return sitk.GetArrayFromImage(res)
 
 
-# ------------------------------------------------------------------
 def preprocess_all_volumes(
     out_dir: str,
     label_file: str,
@@ -192,7 +292,7 @@ def preprocess_all_volumes(
 
         print(f"\n[{idx+1}/{len(df)}] {path}  ({modality})")
 
-        # ① build 3-D volumes
+        # 1. build 3-D volumes
         vol_dict = stacking2D(
             img_dir=path,
             target_shape=target_shape,
@@ -204,22 +304,24 @@ def preprocess_all_volumes(
             print("  ↳ stacking failed, skip")
             continue
 
-        # ② iterate over sequences (T1, T2, FLAIR…)
+        # 2. iterate over sequences (T1, T2, FLAIR…)
         for seq, vol_int in vol_dict.items():
             # cast to float32 before resampling
             vol_float = vol_int.astype(np.float32)
             vol_iso = resample_isotropic(vol_float, original_spacing)
 
-            # ③ volume-level intensity normalisation
+            # 3. volume-level intensity normalisation
             if modality.upper() == "MRI":
+                # vol_iso = skull_strip_array(vol_iso) # skull stripping, haven't tested with full data set yet, but works pretty good with small dataset. 
                 vol_iso = n4_bias_correct(vol_iso)    
                 mu, sigma = vol_iso.mean(), vol_iso.std()
                 vol_norm = helper.z_score_norm(vol_iso, mu, sigma)
-            else:  # DAT
+            else:  # DAT,  reason why I skip bias correction for DAT:
+                   # SPECT signals are sparse and high-contrast; applying N4 would likely smooth out genuine hotspots by mistaking them for artefacts.   
                 vmin, vmax = vol_iso.min(), vol_iso.max()
                 vol_norm = helper.min_max_norm(vol_iso, vmax, vmin)
 
-            # ④ add channel dimension (C,D,H,W) and save
+            # 4. add channel dimension (C,D,H,W) and save
             vol_norm = np.expand_dims(vol_norm.astype(np.float32), axis=0)
 
             seq_safe = os.path.basename(seq).rstrip("_")  # drop path and trailing '_'
@@ -232,25 +334,26 @@ def preprocess_all_volumes(
 
 
 
-# ------------------------------------------------------------------
 def n4_bias_correct(vol_float: np.ndarray,
                     mask: np.ndarray | None = None,
                     iter_list=(50, 50, 30, 20)) -> np.ndarray:
+   """
+    Perform N4 bias-field correction at full resolution (CPU-only, therefore slower).
+    The input volume must contain only positive values; recommend scaling to 0–1 or 0–65535.
     """
-    直接在原分辨率做 N4BiasFieldCorrection（CPU 会慢一些）
-    vol_float 必须全为正数；建议输入 0–1 或 0–65535 区间
-    """
+
     # SimpleITK Image
     img = sitk.GetImageFromArray(vol_float)
 
-    # 自动生成粗掩模（> 5% 最大值）
+    # Automatically generate a coarse mask (> 5 % of the maximum value)
     if mask is None:
         mask = (vol_float > vol_float.max() * 0.05).astype(np.uint8)
     mask_img = sitk.GetImageFromArray(mask)
 
     # N4 filter
     corrector = sitk.N4BiasFieldCorrectionImageFilter()
-    corrector.SetMaximumNumberOfIterations(iter_list)   # 每金字塔层迭代次数
+    corrector.SetMaximumNumberOfIterations(iter_list)   # Number of iterations for each pyramid level
+
     img_corr  = corrector.Execute(img, mask_img)
 
     return sitk.GetArrayFromImage(img_corr).astype(np.float32)
