@@ -103,13 +103,6 @@ def stacking2D(
     return volumes
 
 
-import os
-import tempfile
-import subprocess
-import shutil
-import numpy as np
-import nibabel as nib
-
 def skull_strip_array(
         volume: np.ndarray,
         device: str = "cpu",
