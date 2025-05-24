@@ -13,6 +13,7 @@ import SimpleITK as sitk
 import napari
 import helper
 import tempfile
+from tqdm import tqdm
 # import non_iid_split
 
 skip_keywords = [
@@ -137,7 +138,7 @@ def skull_strip_array(volume: np.ndarray) -> np.ndarray:
 
         try:
             result = subprocess.run(
-                ["hd-bet", "-i", nifti_path, "-o", output_path, "-device", "cpu"],
+                ["hd-bet", "-i", nifti_path, "-o", output_path, "-device", "cuda"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 check=True,
@@ -201,29 +202,16 @@ def preprocess_all_volumes(
     os.makedirs(out_dir, exist_ok=True)
     df = pd.read_csv(label_file)
 
-
-    for idx, row in df.iterrows():
-        
+    for idx, row in tqdm(df.iterrows(), total=len(df), desc="处理受试者", unit="个"):
         subj = row["SubjectID"]
         label = row["Class"]
         modality = row["Type"]
         path = row["FilePath"]
 
-
-
-
         # skip dat files temporarily
         if modality.strip().lower() == "dat":
             print(f"  ↳ Skipping {subj} ({modality}) [DAT skipped]")
             continue
-
-
-
-
-
-
-
-
 
         print(f"\n[{idx+1}/{len(df)}] {path}  ({modality})")
 
