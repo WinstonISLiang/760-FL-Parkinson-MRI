@@ -202,7 +202,7 @@ def preprocess_all_volumes(
     os.makedirs(out_dir, exist_ok=True)
     df = pd.read_csv(label_file)
 
-    for idx, row in tqdm(df.iterrows(), total=len(df), desc="处理受试者", unit="个"):
+    for idx, row in tqdm(df.iterrows(), total=len(df), desc="Processing subjects", unit="subjects"):
         subj = row["SubjectID"]
         label = row["Class"]
         modality = row["Type"]
@@ -227,10 +227,10 @@ def preprocess_all_volumes(
             print("  ↳ stacking failed, skip")
             continue
         
-        # 优先级序列
+        # Priority sequences
         priority = ["t1", "mprage", "flair"]
 
-# 对 MRI 模态进行结构序列优选
+        # Optimize MRI modality sequence selection
         if modality.upper() == "MRI":
             def rank(seq_name):
                 lower = seq_name.lower()
@@ -239,16 +239,16 @@ def preprocess_all_volumes(
                         return i
                 return len(priority)
 
-    # 排序所有序列（rank 优先 + 切片数量倒序）
+            # Sort all sequences (rank priority + slice count descending)
             sorted_vols = sorted(
-            vol_dict.items(),
+                vol_dict.items(),
                 key=lambda item: (rank(item[0]), -item[1].shape[0])
             )
 
-            # 保留排序后的第一个（最优序列）
+            # Keep only the first (optimal) sequence after sorting
             sorted_vols = sorted_vols[:1]
         else:
-            # DAT 数据保留所有序列
+            # Keep all sequences for DAT data
             sorted_vols = vol_dict.items()
 
         # ② iterate over sequences (T1, T2, FLAIR…)
@@ -286,20 +286,20 @@ def n4_bias_correct(vol_float: np.ndarray,
                     mask: np.ndarray | None = None,
                     iter_list=(50, 50, 30, 20)) -> np.ndarray:
     """
-    直接在原分辨率做 N4BiasFieldCorrection（CPU 会慢一些）
-    vol_float 必须全为正数；建议输入 0–1 或 0–65535 区间
+    Perform N4BiasFieldCorrection at original resolution (may be slower on CPU)
+    vol_float must be all positive; recommended input range 0-1 or 0-65535
     """
     # SimpleITK Image
     img = sitk.GetImageFromArray(vol_float)
 
-    # 自动生成粗掩模（> 5% 最大值）
+    # Automatically generate coarse mask (> 5% of max value)
     if mask is None:
         mask = (vol_float > vol_float.max() * 0.05).astype(np.uint8)
     mask_img = sitk.GetImageFromArray(mask)
 
     # N4 filter
     corrector = sitk.N4BiasFieldCorrectionImageFilter()
-    corrector.SetMaximumNumberOfIterations(iter_list)   # 每金字塔层迭代次数
+    corrector.SetMaximumNumberOfIterations(iter_list)   # iterations per pyramid level
     img_corr  = corrector.Execute(img, mask_img)
 
     return sitk.GetArrayFromImage(img_corr).astype(np.float32)
