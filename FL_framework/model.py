@@ -4,7 +4,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-
 class Deeper3DCNN(nn.Module):
     def __init__(self, dropout=0.5):
         super(Deeper3DCNN, self).__init__()
@@ -21,7 +20,7 @@ class Deeper3DCNN(nn.Module):
 
         self.pool = nn.MaxPool3d(2)
         self.dropout = nn.Dropout(dropout)
-        self.fc1 = nn.Linear(64 * 2 * 4 * 4, 32)
+        self.fc1 = None
         self.fc2 = nn.Linear(32, 2)
 
     def forward(self, x):
@@ -30,6 +29,11 @@ class Deeper3DCNN(nn.Module):
         x = self.pool(torch.relu(self.bn3(self.conv3(x))))
         x = self.pool(torch.relu(self.bn4(self.conv4(x))))
         x = self.pool(torch.relu(self.bn5(self.conv5(x))))
+
         x = x.view(x.size(0), -1)
+
+        if self.fc1 is None:
+            self.fc1 = nn.Linear(x.size(1), 32).to(x.device)
+
         x = self.dropout(torch.relu(self.fc1(x)))
         return self.fc2(x)

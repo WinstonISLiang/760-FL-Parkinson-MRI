@@ -9,6 +9,7 @@ from torch.utils.data import TensorDataset, DataLoader, WeightedRandomSampler
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix
 import flwr as fl
+import re
 
 base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 data_path = os.path.join(base_dir, "client_data1", "client_2")
@@ -16,7 +17,10 @@ data_path = os.path.join(base_dir, "client_data1", "client_2")
 X, y = [], []
 for file in os.listdir(data_path):
     if file.endswith(".npy"):
-        label = int(file.split("_")[3])
+        match = re.search(r'label([01])', file)
+        if not match:
+            continue
+        label = int(match.group(1))      # ← 新写法
         vol = np.load(os.path.join(data_path, file))
         X.append(vol)
         y.append(label)
@@ -29,17 +33,13 @@ for i in range(len(X)):
     X_aug.append(flipped)
     y_aug.append(y[i])
 
-# vertical flip
 X = np.concatenate([X, np.array(X_aug)])
 y = np.concatenate([y, np.array(y_aug)])
-X_flip_v = [np.flip(x, axis=2) for x in X]
-y_flip_v = y.copy()
 
-# Gaussian noise
 X_noise = [x + np.random.normal(0, 0.01, x.shape) for x in X]
 y_noise = y.copy()
-X = np.concatenate([X, np.array(X_flip_v), np.array(X_noise)])
-y = np.concatenate([y, np.array(y_flip_v), np.array(y_noise)])
+X = np.concatenate([X, np.array(X_noise)])
+y = np.concatenate([y, np.array(y_noise)])
 
 # Normalization and split into training and test sets
 X = np.array(X, dtype=np.float32)
