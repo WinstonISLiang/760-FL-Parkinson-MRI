@@ -1,0 +1,17 @@
+algorithm: fedavg
+comm_round: 5
+client_num_in_total: 2
+client_num_per_round: 2
+batch_size: 8
+epochs: 1
+lr: 0.001
+noise_multiplier: 1.0
+max_grad_norm: 1.0
+data_dir: C:/Users/USER/Documents/DP/ClientData
+
+# Enable security features
+use_dp: true
+dp_target_epsilon: 5.0
+dp_delta: 1e-5
+dp_max_grad_norm: 1.0
+use_sa: true
